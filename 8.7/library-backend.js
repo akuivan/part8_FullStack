@@ -198,7 +198,7 @@ const resolvers = {
       if (!author) {
         return null
       }
-      
+      // If author exists, then update year of birth
       const updatedAuthor = {...author, born: args.setBornTo}
       authors = authors.map(a => a.name === args.name ? updatedAuthor : a)
       return updatedAuthor
