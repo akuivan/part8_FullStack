@@ -158,20 +158,15 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
-    bookCount: () => books.length,
-    authorCount: () => authors.length,
-    allBooks: (_, args) => {
-      const { author, genre } = args;
-
-      // Filter books based on optional parameters author and genre
-      return books.filter(book => {
-        const authorMatch = author ? book.author === author : true;
-        const genreMatch = genre ? book.genres.includes(genre) : true;
-        
-        return authorMatch && genreMatch;
-      });
+    bookCount: async () => Book.collection.countDocuments(),
+    authorCount: async () => Author.collection.countDocuments(),
+    allBooks: async (_, args) => {
+      return Book.find({})
     },
-    allAuthors: () => {
+    allAuthors: async(_, args) => {
+      return Author.find({})
+      // old code from previous exercises:
+      /* 
       // Count books per author
       const authorBookCount = {};
 
@@ -182,7 +177,6 @@ const resolvers = {
           authorBookCount[book.author] = 1;
         }
       });
-
       // Return a list of authors with their corresponding book counts
       return authors.map(author => ({
         name: author.name,
@@ -190,28 +184,32 @@ const resolvers = {
         id: author.id,
         bookCount: authorBookCount[author.name]
       }));
+      */
     }
   },
   
   Mutation: {
-    addBook: (_, { title, author, published, genres }) => {
-      // Check if book's author already exists
-      let existingAuthor = authors.find(a => a.name === author);
-
-      if (!existingAuthor) {
-        // If not then add it
-        existingAuthor = { id: uuid(), name: author, born: null, bookCount: 0 };
-        authors = authors.concat(existingAuthor)
+    addBook: async (_, args) => {
+      // Check if the author already exists
+      let author = await Author.findOne({ name: args.author });
+      if (!author) {
+        author = new Author({ name: args.author, born: null });
+        await author.save()
       }
-
-      // Add the new book
-      const newBook = { id: uuid(), title, author: existingAuthor, published, genres };
-      books = books.concat(newBook)
-
-      // Update book count for the author
-      author.bookCount += 1;
-
-      return newBook;
+  
+      // Create a new book with the author's ObjectId
+      const newBook = new Book({
+        title: args.title,
+        author: author._id,
+        published: args.published,
+        genres: args.genres
+      });
+  
+      // Save the new book
+      const savedBook = await newBook.save()
+      // Populate the author field in the saved book
+      const populatedBook = await Book.findById(savedBook._id).populate('author')
+      return populatedBook;
     },
     editAuthor: (_, args) => {
       // Check if author exists
